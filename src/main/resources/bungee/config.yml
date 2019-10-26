@@ -1,0 +1,14 @@
+port: 5000
+network: "Euphalys"
+debug: false
+HubGroups: [Hub18R3, Hub19R2]
+Hub:
+  onlineAmount: 1
+  maxAmount: 12
+  #max par serveur
+  maxOnline: 20
+  ramInMegabyte: 1024
+  base: [BASE-1]
+  data:
+    startserver: 20
+    plugins: []

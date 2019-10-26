@@ -1,0 +1,5 @@
+name: OTL
+version: ${project.version}
+author: Dinnerwolph
+main: fr.dinnerwolph.otl.bukkit.BukkitOTL
+load: STARTUP
