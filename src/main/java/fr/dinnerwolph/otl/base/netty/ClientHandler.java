@@ -38,7 +38,7 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         context = ctx;
         format();
-        Base.info("Successfully connected to bungee socket !");
+        Base.info("Successfully connected to OTL socket !");
         FileUtils.deleteDirectory(new File(base.getConfig().getServers()));
     }
 

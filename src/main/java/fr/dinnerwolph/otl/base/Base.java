@@ -26,7 +26,7 @@ public class Base {
     public String address;
     public int port;
     public Map<String, Group> groups = new HashMap();
-    public final boolean debug = false;
+    public final boolean debug = true;
 
     public static void info(String info) {
         System.out.println(info);
@@ -83,7 +83,7 @@ public class Base {
     }
 
     public void reconnect() {
-        info("Disconnected from bungeecord. Reconnecting...");
+        info("Disconnected from server. Reconnecting...");
         try {
             Thread.sleep(3000L);
         } catch (Exception e) {

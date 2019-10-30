@@ -23,7 +23,7 @@ import java.util.List;
 
 public class Join implements Listener {
 
-    @EventHandler
+    @EventHandler()
     public void onPlayerJoin(PreLoginEvent event) {
         if (BungeeOTL.getInstance().start) {
             event.setCancelled(true);

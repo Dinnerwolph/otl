@@ -28,7 +28,9 @@ public class OTLCommands extends Command implements TabExecutor {
 
     @Override
     public void execute(CommandSender commandSender, String[] args) {
-        if (args.length == 0)
+        commandSender.sendMessage(new TextComponent("Commande indisponible."));
+        return;
+        /**if (args.length == 0)
             displayHelp(commandSender);
         else {
             if (args[0].equals("restartgroup")) {
@@ -67,7 +69,7 @@ public class OTLCommands extends Command implements TabExecutor {
                 ServerHandler.memory();
             } else
                 displayHelp(commandSender);
-        }
+        }*/
 
     }
 

@@ -3,17 +3,17 @@ package fr.dinnerwolph.otl.bungee;
 import fr.dinnerwolph.otl.bungee.commands.OTLCommands;
 import fr.dinnerwolph.otl.bungee.config.Config;
 import fr.dinnerwolph.otl.bungee.listener.ListenerManager;
+import fr.dinnerwolph.otl.bungee.netty.BungeeHandler;
 import fr.dinnerwolph.otl.bungee.netty.ServerHandler;
 import fr.dinnerwolph.otl.bungee.server.Group;
 import fr.dinnerwolph.otl.bungee.server.Server;
+import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.ChannelPipeline;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.codec.string.StringEncoder;
 import io.netty.handler.timeout.IdleStateHandler;
@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author Dinnerwolph
@@ -43,7 +44,7 @@ public class BungeeOTL extends Plugin {
     public int hubstart;
     public int port;
     public String network;
-    public boolean debug = false;
+    public boolean debug = true;
     public boolean start;
     public int count;
     public int max;
@@ -76,49 +77,51 @@ public class BungeeOTL extends Plugin {
     @Override
     public void onEnable() {
         new Config();
-        new ListenerManager();
-        initnetty();
+
+        new Thread() {
+            @Override
+            public void run() {
+                initnetty();
+            }
+        }.start();
         IEuphalysPlugin plugin = (IEuphalysPlugin) getProxy().getPluginManager().getPlugin("EuphalysApi");
         getProxy().getPluginManager().registerCommand(this, new OTLCommands(plugin));
     }
 
     private void initnetty() {
-        getProxy().getScheduler().runAsync(instance, () -> {
-            info("Starting socket-server...");
+        NioEventLoopGroup workergroup = new NioEventLoopGroup();
+        try {
+            Bootstrap bootstrap = new Bootstrap();
+            bootstrap.group(workergroup);
+            bootstrap.channel(NioSocketChannel.class);
+            bootstrap.handler(new ChannelInitializer<SocketChannel>() {
+                @Override
+                protected void initChannel(SocketChannel socketChannel) {
+                    socketChannel.pipeline().addLast(new StringEncoder(), new StringDecoder(), new BungeeHandler(instance));
+                }
+            });
+            ChannelFuture future = null;
+            try {
+                future = bootstrap.connect("127.0.0.1", 5000).sync();
+            } catch (Exception e) {
+                //reconnect();
+            }
 
             try {
-                initserver();
+                future.channel().closeFuture().sync();
             } catch (Exception e) {
-                error("Error while initializing socket-server:");
-                e.printStackTrace();
+                //reconnect();
             }
-        });
+        } finally {
+            workergroup.shutdownGracefully();
+            reconnect();
+        }
     }
 
-    private void initserver() {
-        NioEventLoopGroup boosGroup = new NioEventLoopGroup();
-        NioEventLoopGroup workerGroup = new NioEventLoopGroup();
-        ServerBootstrap bootstrap = new ServerBootstrap();
-        bootstrap.group(boosGroup, workerGroup);
-        bootstrap.channel(NioServerSocketChannel.class);
-        final EventExecutorGroup group = new DefaultEventExecutorGroup(1500);
-
-        bootstrap.childHandler(new ChannelInitializer<SocketChannel>() {
-            @Override
-            protected void initChannel(SocketChannel socketChannel) {
-                ChannelPipeline pipeline = socketChannel.pipeline();
-                pipeline.addLast("idleStateHandler", new IdleStateHandler(0, 0, 1));
-                pipeline.addLast(new StringDecoder(), new StringEncoder());
-                pipeline.addLast(group, "serverHandler", new ServerHandler(instance));
-            }
-        });
-
-        bootstrap.childOption(ChannelOption.SO_KEEPALIVE, true);
-
-        try {
-            bootstrap.bind(port).sync();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+    public void reconnect() {
+        info("Disconnected from server. Reconnecting...");
+        getProxy().getScheduler().schedule(instance, () -> {
+            initnetty();
+        }, 3, TimeUnit.SECONDS);
     }
 }
