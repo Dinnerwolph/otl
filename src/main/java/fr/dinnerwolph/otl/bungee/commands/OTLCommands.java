@@ -4,11 +4,9 @@ import fr.dinnerwolph.otl.bungee.BungeeOTL;
 import fr.dinnerwolph.otl.bungee.netty.ServerHandler;
 import fr.dinnerwolph.otl.bungee.server.Group;
 import fr.dinnerwolph.otl.bungee.server.Server;
-import net.euphalys.api.player.IEuphalysPlayer;
 import net.euphalys.api.plugin.IEuphalysPlugin;
 import net.md_5.bungee.api.CommandSender;
 import net.md_5.bungee.api.chat.TextComponent;
-import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.plugin.Command;
 import net.md_5.bungee.api.plugin.TabExecutor;
 import org.json.simple.JSONObject;
@@ -28,9 +26,7 @@ public class OTLCommands extends Command implements TabExecutor {
 
     @Override
     public void execute(CommandSender commandSender, String[] args) {
-        commandSender.sendMessage(new TextComponent("Commande indisponible."));
-        return;
-        /**if (args.length == 0)
+        if (args.length == 0)
             displayHelp(commandSender);
         else {
             if (args[0].equals("restartgroup")) {
@@ -39,37 +35,22 @@ public class OTLCommands extends Command implements TabExecutor {
                     if (group == null)
                         commandSender.sendMessage(new TextComponent("§cErreur : Ce groupe n'existe pas."));
                     else {
-                        try {
-                            ServerHandler.restartGroup(group);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                        for (ProxiedPlayer player : BungeeOTL.getInstance().getProxy().getPlayers()) {
-                            IEuphalysPlayer euphalysPlayer = plugin.getPlayer(player.getUniqueId());
-                            if (euphalysPlayer.hasPermission("otl.admin"))//TODO changer la perms
-                                player.sendMessage(new TextComponent("§7[§cOTL§7] §c>> " + commandSender.getName() + "viens de redémarrer le groupe de serveurs §4" + group.getGroupName()));
-                        }
+                        BungeeOTL.getInstance().handler.restartGroup(group, commandSender.getName());
                     }
                 }
             } else if (args[0].equals("restartserver")) {
                 commandSender.sendMessage(new TextComponent("cmd en dev :/"));
-                if (true)    //TODO remove this
-                    return;
                 Server server = BungeeOTL.getInstance().serverMap.get(args[1]);
                 if (server == null)
                     commandSender.sendMessage(new TextComponent("§cErreur : Ce serveur n'existe pas."));
                 else {
-                    for (ProxiedPlayer player : BungeeOTL.getInstance().getProxy().getPlayers()) {
-                        IEuphalysPlayer euphalysPlayer = plugin.getPlayer(player.getUniqueId());
-                        if (euphalysPlayer.hasPermission("otl.admin"))//TODO changer la perms
-                            player.sendMessage(new TextComponent("§7[§cOTL§7] §c>> " + commandSender.getName() + " viens de redémarrer le serveurs §4" + server.getName()));
-                    }
+                    BungeeOTL.getInstance().handler.restartServer(server.getName(), commandSender.getName());
                 }
             } else if (args[0].equals("memory")) {
                 ServerHandler.memory();
             } else
                 displayHelp(commandSender);
-        }*/
+        }
 
     }
 

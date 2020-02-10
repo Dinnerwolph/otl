@@ -1,8 +1,8 @@
 package fr.dinnerwolph.otl.servers;
 
+import fr.dinnerwolph.otl.servers.netty.ServerHandler;
 import fr.dinnerwolph.otl.servers.server.Group;
 import fr.dinnerwolph.otl.servers.server.Server;
-import fr.dinnerwolph.otl.servers.netty.ServerHandler;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -36,47 +36,28 @@ public class OTLServer {
     public int max;
     public int count;
     public boolean start;
-    public File file;
+    private File file;
     public Map<String, Object> config;
     public int hubstart;
 
     public OTLServer() throws IOException {
         instance = this;
-         channelMap = new HashMap<>();
-         serverMap = new HashMap<>();
-         groupList = new HashMap<>();
-         tempMap = new HashMap<>();
-         count = 0;
-         start = true;
-         file = new File("config.yml");
-         if(!file.exists())
-             Files.copy(getClass().getResourceAsStream("/bungee/config.yml"), file.toPath(), new CopyOption[0]);
-         config = new Yaml().load(new FileReader(file));
-         Group group;
-         List<String> baseList;
-         ArrayList<String> pluginsList = new ArrayList<>();
-         for(String name : config.keySet()) {
-             if(name.equals("HubGroups")) {
+        channelMap = new HashMap<>();
+        serverMap = new HashMap<>();
+        groupList = new HashMap<>();
+        tempMap = new HashMap<>();
+        count = 0;
+        start = true;
+        file = new File("config.yml");
+        if (!file.exists())
+            Files.copy(getClass().getResourceAsStream("/bungee/config.yml"), file.toPath(), new CopyOption[0]);
+        config = new Yaml().load(new FileReader(file));
+        for (String name : config.keySet())
+            if (name.equals("HubGroups"))
                 hubGroups = (List<String>) config.get(name);
-             }else {
-                 LinkedHashMap<String, Object> hashMap = (LinkedHashMap<String, Object>) config.get(name);
-                 Object o = hashMap.get("data");
-                 boolean startOnInit = true;
-                 if (hashMap.get("startOnInit") != null)
-                     startOnInit = (boolean) hashMap.get("startOnInit");
-                 if (o != null) {
-                     LinkedHashMap map = (LinkedHashMap) o;
-                     int startserver = (int) map.get("startserver");
-                     if (startserver != 0)
-                         hubstart = startserver;
-                     pluginsList = (ArrayList<String>) map.get("plugins");
-                 }
-                 baseList = (ArrayList<String>) hashMap.get("base");
-                 group = new Group(name, (Integer) hashMap.get("onlineAmount"), (Integer) hashMap.get("maxAmount"), (Integer) hashMap.get("ramInMegabyte"), baseList.toArray(new String[0]), pluginsList, (Integer) hashMap.get("maxOnline"), startOnInit);
-                 groupList.put(name, group);
-             }
-         }
-     initserver();
+            else
+                loadGroup(name);
+        initserver();
     }
 
     private void initserver() {
@@ -104,5 +85,26 @@ public class OTLServer {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+    }
+
+    public void loadGroup(String groupName) {
+        LinkedHashMap<String, Object> hashMap = (LinkedHashMap<String, Object>) config.get(groupName);
+        ArrayList<String> pluginsList = new ArrayList<>();
+        Object o = hashMap.get("data");
+        Group group;
+        List<String> baseList;
+        boolean startOnInit = true;
+        if (hashMap.get("startOnInit") != null)
+            startOnInit = (boolean) hashMap.get("startOnInit");
+        if (o != null) {
+            LinkedHashMap map = (LinkedHashMap) o;
+            int startserver = (int) map.get("startserver");
+            if (startserver != 0)
+                hubstart = startserver;
+            pluginsList = (ArrayList<String>) map.get("plugins");
+        }
+        baseList = (ArrayList<String>) hashMap.get("base");
+        group = new Group(groupName, (Integer) hashMap.get("onlineAmount"), (Integer) hashMap.get("maxAmount"), (Integer) hashMap.get("ramInMegabyte"), baseList.toArray(new String[0]), pluginsList, (Integer) hashMap.get("maxOnline"), startOnInit);
+        groupList.put(groupName, group);
     }
 }

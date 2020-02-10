@@ -26,17 +26,21 @@ public class Join implements Listener {
     @EventHandler()
     public void onPlayerJoin(PreLoginEvent event) {
         if (BungeeOTL.getInstance().start) {
+            event.registerIntent(BungeeOTL.getInstance());
             event.setCancelled(true);
+            event.setCancelReason(new TextComponent("Serveur en cours de lancement."));
             event.getConnection().disconnect(new TextComponent("Serveur en cours de lancement."));
+            event.completeIntent(BungeeOTL.getInstance());
+            return;
         }
-        Collection<ProxiedPlayer> proxiedPlayers = BungeeOTL.getInstance().getProxy().getPlayers();
+        /**Collection<ProxiedPlayer> proxiedPlayers = BungeeOTL.getInstance().getProxy().getPlayers();
         List<Server> serverList = new ArrayList<>();
         for (String name : BungeeOTL.getInstance().serverMap.keySet())
             if (name.contains("Hub"))
                 serverList.add(BungeeOTL.getInstance().serverMap.get(name));
         int a = serverList.size() * BungeeOTL.getInstance().hubstart;
-        if (a - proxiedPlayers.size() <= 10)
-            ServerHandler.startNewHub(serverList.size() + 1);
+        /**if (a - proxiedPlayers.size() <= 10)
+            ServerHandler.startNewHub(serverList.size() + 1);*/
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -47,9 +51,9 @@ public class Join implements Listener {
         }
     }
 
-    private final String getPourcent() {
-        System.out.println(BungeeOTL.getInstance().count);
-        System.out.println(BungeeOTL.getInstance().max);
+    private String getPourcent() {
+        if(BungeeOTL.getInstance().max == 0)
+            return "0";
         return "" + BungeeOTL.getInstance().count * 100 / BungeeOTL.getInstance().max;
     }
 

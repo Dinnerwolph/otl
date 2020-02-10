@@ -11,7 +11,10 @@ import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 
 import java.net.InetSocketAddress;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class ServerHandler extends ChannelInboundHandlerAdapter {
 
@@ -76,6 +79,8 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
                     for (Server server1 : plugin.serverMap.values()) {
                         ctx.writeAndFlush(format("ADD_SERVER", format(server1.getName(), ((InetSocketAddress) server1.getChannel().remoteAddress()).getAddress().getHostAddress(), server1.getPort())));
                     }
+                    if(!plugin.start)
+                        ctx.writeAndFlush(format("SERVER_ENABLE", null));
                 }
                 break;
             case "INIT_SERVER": {
@@ -96,9 +101,8 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
                             if (plugin.channelMap.get(name).closeFuture() == future) {
                                 System.out.println(name + " has disconnected");
                                 plugin.channelMap.remove(name);
-                                for (String channelKey : plugin.channelMap.keySet())
-                                    if (channelKey.contains("Proxy"))
-                                        plugin.channelMap.get(channelKey).writeAndFlush(format("REMOVE_SERVER", name));
+                                for (Channel channel : getProxyList())
+                                    channel.writeAndFlush(format("REMOVE_SERVER", name));
                                 Server temp = plugin.serverMap.get(name);
                                 serverClosed(temp);
                                 plugin.serverMap.remove(name);
@@ -117,16 +121,16 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
                 plugin.serverMap.put(server, servers);
                 plugin.tempMap.remove(server);
                 plugin.count++;
-                if (plugin.count >= plugin.max)
+                if (plugin.count >= plugin.max) {
                     plugin.start = false;
+                    for (Channel channel : getProxyList())
+                        channel.writeAndFlush(format("SERVER_ENABLE", null));
+                }
                 for (String serverkey : plugin.serverMap.keySet())
                     sendInformation(plugin.serverMap.get(serverkey));
-                System.out.println(plugin.channelMap.keySet());
-                for (String channelKey : plugin.channelMap.keySet())
-                    if (channelKey.contains("Proxy")) {
-                        plugin.channelMap.get(channelKey).writeAndFlush(format("ADD_SERVER", format(servers.getName(), ((InetSocketAddress) servers.getChannel().remoteAddress()).getAddress().getHostAddress(), servers.getPort())));
+                for (Channel channel : getProxyList())
+                    channel.writeAndFlush(format("ADD_SERVER", format(servers.getName(), ((InetSocketAddress) servers.getChannel().remoteAddress()).getAddress().getHostAddress(), servers.getPort())));
 
-                    }
                 break;
             }
             case "STOP_SERVER":
@@ -136,10 +140,8 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
                     plugin.channelMap.remove(server);
                     plugin.serverMap.remove(server);
                     HashMap<String, Server> serverMap = new HashMap<>(plugin.serverMap);
-                    for (String name : plugin.channelMap.keySet()) {
-                        if (name.contains("Proxy")) {
-                            //TODO send remove server to proxies
-                        }
+                    for (Channel proxy : getProxyList()) {
+                        //TODO send remove server to proxies
                     }
                     for (String name : serverMap.keySet())
                         if (name.contains("Hub")) {
@@ -160,10 +162,11 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
                 int count = 0;
                 String serv = server.replaceAll("[0-9]", "");
                 for (String key : plugin.serverMap.keySet())
-                    if (key.contains(serv))
-                        if (plugin.serverMap.get(key).getStatus().equalsIgnoreCase("WAITING"))
+                    if (key.contains(serv)) {
+                        System.out.println(key + ": " + plugin.serverMap.get(key).getStatus());
+                        if (plugin.serverMap.get(key).getStatus().equals("WAITING") || plugin.serverMap.get(key).getStatus().equals("INIT_SERVER") || plugin.serverMap.get(key).getStatus().equals("STARTED"))
                             count++;
-
+                    }
                 if (count == 0) {
                     List<String> servers = new ArrayList<>();
                     for (String servername : plugin.serverMap.keySet())
@@ -186,10 +189,35 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
             case "REMOVED_port":
                 plugin.serverMap.get(server).getChannel().writeAndFlush(object.toJSONString());
                 break;
-            case "SEND_TO_HUB": {
-
+            case "SEND_TO_HUB":
+                for (Channel channel : getProxyList())
+                    channel.writeAndFlush(format(type, data.toString()));
                 break;
-            }
+            case "RESTART_GROUP":
+                Group group = plugin.groupList.get(data);
+                for (Server servers : plugin.serverMap.values())
+                    if (servers.getGroup() == group)
+                        servers.getChannel().writeAndFlush(format("FORCED_STOP", null));
+                plugin.groupList.remove(group.getGroupName());
+                plugin.loadGroup(group.getGroupName());
+                Group newGroup = plugin.groupList.get(group.getGroupName());
+                for (String base : group.getBase()) {
+                        plugin.channelMap.get(base).writeAndFlush(format("DELETE_GROUP", group.getGroupName()));
+                    plugin.channelMap.get(base).writeAndFlush(format("SEND_GROUP", format(newGroup.getGroupName(), newGroup.getOnlineAmount(), newGroup.getMaxAmount(), newGroup.getRamInMegabyte(), newGroup.getPluginsList())));
+
+                }
+                for(Channel channel : getProxyList())
+                    channel.writeAndFlush(format("RESTART_GROUP", (String) data, (String) object.get("player")));
+                break;
+            case "RESTART_SERVER":
+                Server target = plugin.serverMap.get(data);
+                target.getChannel().writeAndFlush(format("FORCED_STOP", null));
+                plugin.serverMap.remove(data);
+                for(Channel channel : getProxyList())
+                    channel.writeAndFlush(format("RESTART_SERVER", (String) data, (String) object.get("player")));
+                for(String base : target.getGroup().getBase())
+                    plugin.channelMap.get(base).writeAndFlush(format("RESTART_SERVER", (String) data));
+                break;
         }
     }
 
@@ -260,6 +288,14 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
             }
         }
         return returnmap;
+    }
+
+    private List<Channel> getProxyList() {
+        List<Channel> returnList = new ArrayList<>();
+        for (String name : plugin.channelMap.keySet())
+            if (name.contains("Proxy"))
+                returnList.add(plugin.channelMap.get(name));
+        return returnList;
     }
 
     private void startGame(String name, int number) {

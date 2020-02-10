@@ -21,6 +21,7 @@ import io.netty.util.ResourceLeakDetector;
 import io.netty.util.concurrent.DefaultEventExecutorGroup;
 import io.netty.util.concurrent.EventExecutorGroup;
 import net.euphalys.api.plugin.IEuphalysPlugin;
+import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.plugin.Plugin;
 
 import java.util.ArrayList;
@@ -41,6 +42,7 @@ public class BungeeOTL extends Plugin {
     public Map<String, Server> serverMap;
     public List<String> hubGroups;
     public List<Group> restartGroups;
+    public List<String> serverList;
     public int hubstart;
     public int port;
     public String network;
@@ -48,6 +50,7 @@ public class BungeeOTL extends Plugin {
     public boolean start;
     public int count;
     public int max;
+    public BungeeHandler handler;
 
     public static void info(String info) {
         instance.getLogger().info(info);
@@ -69,6 +72,7 @@ public class BungeeOTL extends Plugin {
         this.channelMap = new ConcurrentHashMap<>();
         this.serverMap = new ConcurrentHashMap<>();
         this.restartGroups = new ArrayList<>();
+        this.serverList = new ArrayList<>();
         this.start = true;
         this.count = 0;
         this.max = 0;
@@ -77,18 +81,18 @@ public class BungeeOTL extends Plugin {
     @Override
     public void onEnable() {
         new Config();
-
+        new ListenerManager();
+        IEuphalysPlugin plugin = (IEuphalysPlugin) getProxy().getPluginManager().getPlugin("EuphalysApi");
         new Thread() {
             @Override
             public void run() {
-                initnetty();
+                initnetty(plugin);
             }
         }.start();
-        IEuphalysPlugin plugin = (IEuphalysPlugin) getProxy().getPluginManager().getPlugin("EuphalysApi");
         getProxy().getPluginManager().registerCommand(this, new OTLCommands(plugin));
     }
 
-    private void initnetty() {
+    private void initnetty(IEuphalysPlugin plugin) {
         NioEventLoopGroup workergroup = new NioEventLoopGroup();
         try {
             Bootstrap bootstrap = new Bootstrap();
@@ -97,7 +101,7 @@ public class BungeeOTL extends Plugin {
             bootstrap.handler(new ChannelInitializer<SocketChannel>() {
                 @Override
                 protected void initChannel(SocketChannel socketChannel) {
-                    socketChannel.pipeline().addLast(new StringEncoder(), new StringDecoder(), new BungeeHandler(instance));
+                    socketChannel.pipeline().addLast(new StringEncoder(), new StringDecoder(), handler = new BungeeHandler(instance, plugin));
                 }
             });
             ChannelFuture future = null;
@@ -114,14 +118,23 @@ public class BungeeOTL extends Plugin {
             }
         } finally {
             workergroup.shutdownGracefully();
-            reconnect();
+            for(String serverInfo : serverList) {
+                getProxy().getServers().remove(serverInfo);
+
+            }
+            this.groupList = new ConcurrentHashMap<>();
+            this.channelMap = new ConcurrentHashMap<>();
+            this.serverMap = new ConcurrentHashMap<>();
+            this.restartGroups = new ArrayList<>();
+            this.serverList = new ArrayList<>();
+            reconnect(plugin);
         }
     }
 
-    public void reconnect() {
+    public void reconnect(IEuphalysPlugin plugin) {
         info("Disconnected from server. Reconnecting...");
         getProxy().getScheduler().schedule(instance, () -> {
-            initnetty();
+            initnetty(plugin);
         }, 3, TimeUnit.SECONDS);
     }
 }

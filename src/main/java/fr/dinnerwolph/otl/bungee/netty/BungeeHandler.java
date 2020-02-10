@@ -2,9 +2,13 @@ package fr.dinnerwolph.otl.bungee.netty;
 
 import fr.dinnerwolph.otl.base.Base;
 import fr.dinnerwolph.otl.bungee.BungeeOTL;
+import fr.dinnerwolph.otl.bungee.server.Group;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import net.euphalys.api.player.IEuphalysPlayer;
+import net.euphalys.api.plugin.IEuphalysPlugin;
+import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
 import org.json.simple.JSONObject;
@@ -25,9 +29,11 @@ public class BungeeHandler extends ChannelInboundHandlerAdapter {
     private Map<Channel, String> c = new HashMap<>();
 
     private final BungeeOTL plugin;
+    private final IEuphalysPlugin api;
 
-    public BungeeHandler(BungeeOTL plugin) {
+    public BungeeHandler(BungeeOTL plugin, IEuphalysPlugin api) {
         this.plugin = plugin;
+        this.api = api;
     }
 
     @Override
@@ -89,6 +95,24 @@ public class BungeeHandler extends ChannelInboundHandlerAdapter {
                 break;
             case "REMOVE_SERVER":
                 BungeeOTL.getInstance().getProxy().getServers().remove(data);
+                break;
+            case "RESTART_GROUP":
+                for (ProxiedPlayer player : BungeeOTL.getInstance().getProxy().getPlayers()) {
+                    IEuphalysPlayer euphalysPlayer = api.getPlayer(player.getUniqueId());
+                    if (euphalysPlayer.hasPermission("otl.admin"))//TODO changer la perms
+                        player.sendMessage(new TextComponent("§7[§cOTL§7] §c>> " + object.get("group") + "viens de redémarrer le groupe de serveurs §4" + data));
+                }
+                break;
+            case "SERVER_ENABLE":
+                plugin.start = false;
+                break;
+            case "RESTART_SERVER":
+                for (ProxiedPlayer player : BungeeOTL.getInstance().getProxy().getPlayers()) {
+                    IEuphalysPlayer euphalysPlayer = api.getPlayer(player.getUniqueId());
+                    if (euphalysPlayer.hasPermission("otl.admin"))//TODO changer la perms
+                        player.sendMessage(new TextComponent("§7[§cOTL§7] §c>> " + object.get("group") + " viens de redémarrer le serveurs §4" + data));
+                }
+                break;
         }
     }
 
@@ -146,7 +170,30 @@ public class BungeeHandler extends ChannelInboundHandlerAdapter {
         }
     }
 
+    private String format(String type, String data) {
+        JSONObject object = new JSONObject();
+        object.put("type", type);
+        object.put("data", data);
+        return object.toString();
+    }
+
+    private String format(String type, String groupName, String playerName) {
+        JSONObject object = new JSONObject();
+        object.put("type", type);
+        object.put("data", groupName);
+        object.put("player", playerName);
+        return object.toString();
+    }
+
     private void sendMessage(String message) {
         context.writeAndFlush(message);
+    }
+
+    public void restartGroup(Group group, String name) {
+        sendMessage(format("RESTART_GROUP", group.getGroupName(), name));
+    }
+
+    public void restartServer(String serverName, String name) {
+        sendMessage(format("RESTART_SERVER", serverName, name));
     }
 }

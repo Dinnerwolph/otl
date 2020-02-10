@@ -178,6 +178,9 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
             case "MEMORY":
                 MemoryUtils.a();
                 break;
+            case "RESTART_SERVER":
+
+                break;
             default:
                 throw new IllegalStateException("Unexpected value: " + type);
         }
